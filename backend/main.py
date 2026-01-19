@@ -10,7 +10,14 @@ import os
 
 from agent_workflow import AgentWorkflow, run_ai_resume_workflow
 from career_guidance import CareerGuidanceService
-from supabase_service import SupabaseService
+
+# Import supabase service with fallback for missing dependencies
+try:
+    from supabase_service import SupabaseService
+    supabase_available = True
+except ImportError:
+    supabase_available = False
+    SupabaseService = None
 
 app = FastAPI(title="AI Resume & Career Assistant API")
 
@@ -26,7 +33,7 @@ app.add_middleware(
 # Initialize services
 agent_workflow = AgentWorkflow()
 career_service = CareerGuidanceService()
-supabase_service = SupabaseService()
+supabase_service = SupabaseService() if supabase_available else None
 
 # Metrics tracking
 metrics = {
