@@ -11,8 +11,8 @@ from reportlab.lib import colors
 from reportlab.lib.units import inch
 """
 NOTE:
-- DOCX generation uses `python-docx` (import name: `docx`).
-- If `python-docx` is not installed in the current environment, we must not
+- DOCX generation uses `docx` (import name: `docx`).
+- If `docx` is not installed in the current environment, we must not
   crash the entire chat flow. So we import it lazily inside generate_docx().
 """
 
@@ -453,11 +453,11 @@ class ResumeGenerator:
         return output_file
 
     def generate_docx(self, resume_data: dict, output_file: str = "resume.docx") -> str:
-        """Minimal DOCX generation using python-docx."""
+        """Minimal DOCX generation using docx."""
         try:
-            from docx import Document  # pip install python-docx
+            from docx import Document  # pip install docx
         except Exception:
-            # If python-docx isn't installed, skip DOCX generation gracefully.
+            # If docx isn't installed, skip DOCX generation gracefully.
             return output_file
 
         doc = Document()
