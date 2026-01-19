@@ -5,6 +5,7 @@ This service is intentionally simple and production-inspired:
 - Reads credentials from environment variables
 - Provides small helper methods for inserts and file uploads
 - Fails gracefully (no-op) when Supabase is not configured
+- Uses direct HTTP calls to avoid Rust dependencies
 """
 
 from __future__ import annotations
@@ -13,26 +14,32 @@ import os
 from typing import Any, Dict, Optional
 
 try:
-    # supabase-py v2 style import
-    from supabase import create_client, Client  # type: ignore
-except Exception:  # pragma: no cover - optional dependency
-    create_client = None  # type: ignore
-    Client = Any  # type: ignore
+    import httpx
+    http_client_available = True
+except ImportError:
+    http_client_available = False
 
 
 class SupabaseService:
-    """Thin wrapper around Supabase client for this MVP."""
+    """Thin wrapper around Supabase HTTP API for this MVP."""
 
     def __init__(self) -> None:
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        self.url = os.getenv("SUPABASE_URL")
+        self.api_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-        self._enabled = bool(url and key and create_client)
-        self._client: Optional[Client] = None
+        self._enabled = bool(self.url and self.api_key and http_client_available)
+        self._client = None
 
         if self._enabled:
             try:
-                self._client = create_client(url, key)
+                self._client = httpx.Client(
+                    base_url=self.url,
+                    headers={
+                        "apikey": self.api_key,
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
+                    }
+                )
             except Exception:
                 # If configuration fails, keep service as disabled
                 self._enabled = False
@@ -73,7 +80,8 @@ class SupabaseService:
         }
 
         try:
-            self._client.table("chatbot_answers").insert(payload).execute()  # type: ignore[union-attr]
+            response = self._client.post("/rest/v1/chatbot_answers", json=payload)
+            response.raise_for_status()
         except Exception:
             # Fail silently in this MVP to avoid breaking the flow
             return
@@ -107,7 +115,8 @@ class SupabaseService:
         }
 
         try:
-            self._client.table("resume_results").upsert(payload).execute()  # type: ignore[union-attr]
+            response = self._client.post("/rest/v1/resume_results", json=payload)
+            response.raise_for_status()
         except Exception:
             return
 

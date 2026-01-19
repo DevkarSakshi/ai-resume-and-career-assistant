@@ -2,13 +2,8 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import os
 
-# PDF generation using reportlab instead of pdfkit
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib import colors
-from reportlab.lib.units import inch
+# PDF generation using fpdf (pure Python)
+from fpdf import FPDF
 """
 NOTE:
 - DOCX generation uses `docx` (import name: `docx`).
@@ -263,47 +258,19 @@ class ResumeGenerator:
         return list(set(suggestions[:5]))
 
     def generate_pdf(self, resume_data: dict, output_file: str = "resume.pdf") -> str:
-        """Generate PDF from resume data using ReportLab.
+        """Generate PDF from resume data using FPDF.
         Creates a professional PDF resume with proper formatting.
         """
         try:
-            doc = SimpleDocTemplate(output_file, pagesize=letter)
-            styles = getSampleStyleSheet()
-
-            # Custom styles
-            title_style = ParagraphStyle(
-                'Title',
-                parent=styles['Heading1'],
-                fontSize=18,
-                spaceAfter=10,
-                alignment=1  # Center alignment
-            )
-
-            heading_style = ParagraphStyle(
-                'Heading',
-                parent=styles['Heading2'],
-                fontSize=14,
-                spaceAfter=6,
-                textColor=colors.darkblue
-            )
-
-            normal_style = styles['Normal']
-            normal_style.fontSize = 10
-            normal_style.spaceAfter = 4
-
-            bullet_style = ParagraphStyle(
-                'Bullet',
-                parent=normal_style,
-                leftIndent=20,
-                bulletIndent=10
-            )
-
-            story = []
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_auto_page_break(auto=True, margin=15)
 
             # Name and Contact Info
             name = resume_data.get("name", "Your Name")
-            story.append(Paragraph(name, title_style))
-            story.append(Spacer(1, 12))
+            pdf.set_font("Arial", "B", 16)
+            pdf.cell(0, 10, name, ln=True, align="C")
+            pdf.ln(5)
 
             # Contact information
             email = resume_data.get("email", "")
@@ -320,30 +287,37 @@ class ResumeGenerator:
 
             if contact_parts:
                 contact_text = " | ".join(contact_parts)
-                story.append(Paragraph(contact_text, normal_style))
-                story.append(Spacer(1, 12))
+                pdf.set_font("Arial", "", 10)
+                pdf.cell(0, 8, contact_text, ln=True, align="C")
+                pdf.ln(5)
 
             # Summary
             summary = resume_data.get("summary", "")
             if summary:
-                story.append(Paragraph("Professional Summary", heading_style))
-                story.append(Paragraph(summary, normal_style))
-                story.append(Spacer(1, 12))
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 8, "Professional Summary", ln=True)
+                pdf.set_font("Arial", "", 10)
+                pdf.multi_cell(0, 6, summary)
+                pdf.ln(3)
 
             # Skills
             skills = resume_data.get("skills", {})
             if skills:
-                story.append(Paragraph("Skills", heading_style))
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 8, "Skills", ln=True)
+                pdf.set_font("Arial", "", 10)
                 for category, skill_list in skills.items():
                     if skill_list:
-                        category_text = f"<b>{category.title()}:</b> {', '.join(skill_list)}"
-                        story.append(Paragraph(category_text, normal_style))
-                story.append(Spacer(1, 12))
+                        category_text = f"{category.title()}: {', '.join(skill_list)}"
+                        pdf.cell(0, 6, category_text, ln=True)
+                pdf.ln(3)
 
             # Experience
             experience = resume_data.get("experience", [])
             if experience:
-                story.append(Paragraph("Professional Experience", heading_style))
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 8, "Professional Experience", ln=True)
+                pdf.set_font("Arial", "", 10)
                 for exp in experience:
                     if isinstance(exp, dict):
                         title = exp.get("title", "")
@@ -352,12 +326,14 @@ class ResumeGenerator:
                         description = exp.get("description", "")
 
                         if title or company:
-                            header = f"<b>{title}</b>"
+                            header = f"{title}"
                             if company:
                                 header += f" at {company}"
                             if duration:
                                 header += f" ({duration})"
-                            story.append(Paragraph(header, normal_style))
+                            pdf.set_font("Arial", "B", 10)
+                            pdf.cell(0, 6, header, ln=True)
+                            pdf.set_font("Arial", "", 10)
 
                         if description:
                             # Handle bullet points
@@ -365,36 +341,40 @@ class ResumeGenerator:
                             for line in desc_lines:
                                 line = line.strip()
                                 if line.startswith('•') or line.startswith('-'):
-                                    story.append(Paragraph(line[1:].strip(), bullet_style))
+                                    pdf.cell(10, 5, "", ln=False)
+                                    pdf.cell(0, 5, f"• {line[1:].strip()}", ln=True)
                                 elif line:
-                                    story.append(Paragraph(line, normal_style))
-
-                        story.append(Spacer(1, 6))
-                story.append(Spacer(1, 12))
+                                    pdf.cell(0, 5, line, ln=True)
+                        pdf.ln(2)
+                pdf.ln(3)
 
             # Education
             education = resume_data.get("education", [])
             if education:
-                story.append(Paragraph("Education", heading_style))
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 8, "Education", ln=True)
+                pdf.set_font("Arial", "", 10)
                 for edu in education:
                     if isinstance(edu, dict):
                         degree = edu.get("degree", "")
                         school = edu.get("school", "")
                         year = edu.get("year", "")
 
-                        edu_text = f"<b>{degree}</b>"
+                        edu_text = f"{degree}"
                         if school:
                             edu_text += f" - {school}"
                         if year:
                             edu_text += f" ({year})"
 
-                        story.append(Paragraph(edu_text, normal_style))
-                story.append(Spacer(1, 12))
+                        pdf.cell(0, 6, edu_text, ln=True)
+                pdf.ln(3)
 
             # Projects
             projects = resume_data.get("projects", [])
             if projects:
-                story.append(Paragraph("Projects", heading_style))
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 8, "Projects", ln=True)
+                pdf.set_font("Arial", "", 10)
                 for project in projects:
                     if isinstance(project, dict):
                         name = project.get("name", "")
@@ -402,43 +382,53 @@ class ResumeGenerator:
                         technologies = project.get("technologies", "")
 
                         if name:
-                            story.append(Paragraph(f"<b>{name}</b>", normal_style))
+                            pdf.set_font("Arial", "B", 10)
+                            pdf.cell(0, 6, name, ln=True)
+                            pdf.set_font("Arial", "", 10)
 
                         if technologies:
-                            story.append(Paragraph(f"<i>Technologies: {technologies}</i>", normal_style))
+                            pdf.set_font("Arial", "I", 9)
+                            pdf.cell(0, 5, f"Technologies: {technologies}", ln=True)
+                            pdf.set_font("Arial", "", 10)
 
                         if description:
                             desc_lines = description.split('\n')
                             for line in desc_lines:
                                 line = line.strip()
                                 if line.startswith('•') or line.startswith('-'):
-                                    story.append(Paragraph(line[1:].strip(), bullet_style))
+                                    pdf.cell(10, 5, "", ln=False)
+                                    pdf.cell(0, 5, f"• {line[1:].strip()}", ln=True)
                                 elif line:
-                                    story.append(Paragraph(line, normal_style))
-
-                        story.append(Spacer(1, 6))
-                story.append(Spacer(1, 12))
+                                    pdf.cell(0, 5, line, ln=True)
+                        pdf.ln(2)
+                pdf.ln(3)
 
             # Certifications
             certifications = resume_data.get("certifications", [])
             if certifications:
-                story.append(Paragraph("Certifications", heading_style))
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 8, "Certifications", ln=True)
+                pdf.set_font("Arial", "", 10)
                 for cert in certifications:
                     if cert:
-                        story.append(Paragraph(f"• {cert}", bullet_style))
-                story.append(Spacer(1, 12))
+                        pdf.cell(10, 5, "", ln=False)
+                        pdf.cell(0, 5, f"• {cert}", ln=True)
+                pdf.ln(3)
 
             # Achievements
             achievements = resume_data.get("achievements", [])
             if achievements:
-                story.append(Paragraph("Achievements", heading_style))
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 8, "Achievements", ln=True)
+                pdf.set_font("Arial", "", 10)
                 for achievement in achievements:
                     if achievement:
-                        story.append(Paragraph(f"• {achievement}", bullet_style))
-                story.append(Spacer(1, 12))
+                        pdf.cell(10, 5, "", ln=False)
+                        pdf.cell(0, 5, f"• {achievement}", ln=True)
+                pdf.ln(3)
 
-            # Build the PDF
-            doc.build(story)
+            # Save the PDF
+            pdf.output(output_file)
 
         except Exception as e:
             print("⚠️ PDF generation failed:", e)
@@ -446,7 +436,7 @@ class ResumeGenerator:
             try:
                 with open(output_file.replace('.pdf', '.txt'), 'w') as f:
                     f.write(f"Resume for {resume_data.get('name', 'User')}\n")
-                    f.write("Generated with ReportLab\n")
+                    f.write("Generated with FPDF\n")
             except Exception:
                 pass
 
