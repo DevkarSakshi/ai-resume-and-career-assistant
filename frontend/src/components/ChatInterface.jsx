@@ -33,7 +33,11 @@ const ChatInterface = ({ sessionId }) => {
     setLoading(true);
 
     try {
-      const response = await axios.post('/api/chat', {
+      const backendUrl = process.env.NODE_ENV === 'production'
+        ? 'https://ai-resume-and-career-assistant.onrender.com'
+        : 'http://localhost:8000';
+
+      const response = await axios.post(`${backendUrl}/api/chat`, {
         message: input.trim(),
         session_id: sessionId
       });
@@ -58,18 +62,22 @@ const ChatInterface = ({ sessionId }) => {
 
   const fetchResume = async () => {
     try {
+      const backendUrl = process.env.NODE_ENV === 'production'
+        ? 'https://ai-resume-and-career-assistant.onrender.com'
+        : 'http://localhost:8000';
+
       // 1️⃣ Fetch stored resume data from backend
-      const response = await axios.get(`/api/resume/${sessionId}`);
+      const response = await axios.get(`${backendUrl}/api/resume/${sessionId}`);
       const resumeData = response.data;
 
       // 2️⃣ Trigger PDF generation on backend
-      await axios.post('/api/resume/generate', {
+      await axios.post(`${backendUrl}/api/resume/generate`, {
         ...resumeData,
         session_id: sessionId
       });
 
       // 3️⃣ Set download URL pointing to backend
-      setDownloadUrl(`http://localhost:8000/download_resume/${sessionId}`);
+      setDownloadUrl(`${backendUrl}/download_resume/${sessionId}`);
     } catch (error) {
       console.error('Error fetching resume:', error);
     }
