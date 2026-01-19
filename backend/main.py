@@ -17,7 +17,7 @@ app = FastAPI(title="AI Resume & Career Assistant API")
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "https://ai-resume-and-career-assistant.onrender.com", "https://*.onrender.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -76,6 +76,10 @@ class ResumeSubmissionPayload(BaseModel):
 @app.get("/")
 async def root():
     return {"message": "AI Resume & Career Assistant API", "status": "running"}
+
+@app.get("/healthz")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 @app.post("/api/chat")
 async def chat(chat_message: ChatMessage, request: Request):

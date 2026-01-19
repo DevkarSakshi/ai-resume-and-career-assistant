@@ -2,7 +2,13 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import os
 
-import pdfkit  # pip install pdfkit
+# PDF generation using reportlab instead of pdfkit
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
 """
 NOTE:
 - DOCX generation uses `python-docx` (import name: `docx`).
@@ -257,24 +263,193 @@ class ResumeGenerator:
         return list(set(suggestions[:5]))
 
     def generate_pdf(self, resume_data: dict, output_file: str = "resume.pdf") -> str:
-        """Generate PDF from the HTML resume.
-        Uses wkhtmltopdf via pdfkit.
-        Fails gracefully on Windows if PDF generation is not possible.
+        """Generate PDF from resume data using ReportLab.
+        Creates a professional PDF resume with proper formatting.
         """
-        html_content = self.generate_html(resume_data)
         try:
-            config = pdfkit.configuration(
-                wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+            doc = SimpleDocTemplate(output_file, pagesize=letter)
+            styles = getSampleStyleSheet()
+
+            # Custom styles
+            title_style = ParagraphStyle(
+                'Title',
+                parent=styles['Heading1'],
+                fontSize=18,
+                spaceAfter=10,
+                alignment=1  # Center alignment
             )
-            options = {"enable-local-file-access": ""}
-            pdfkit.from_string(
-                html_content,
-                output_file,
-                configuration=config,
-                options=options
+
+            heading_style = ParagraphStyle(
+                'Heading',
+                parent=styles['Heading2'],
+                fontSize=14,
+                spaceAfter=6,
+                textColor=colors.darkblue
             )
+
+            normal_style = styles['Normal']
+            normal_style.fontSize = 10
+            normal_style.spaceAfter = 4
+
+            bullet_style = ParagraphStyle(
+                'Bullet',
+                parent=normal_style,
+                leftIndent=20,
+                bulletIndent=10
+            )
+
+            story = []
+
+            # Name and Contact Info
+            name = resume_data.get("name", "Your Name")
+            story.append(Paragraph(name, title_style))
+            story.append(Spacer(1, 12))
+
+            # Contact information
+            email = resume_data.get("email", "")
+            linkedin = resume_data.get("linkedin", "")
+            portfolio = resume_data.get("portfolio", "")
+
+            contact_parts = []
+            if email:
+                contact_parts.append(f"Email: {email}")
+            if linkedin:
+                contact_parts.append(f"LinkedIn: {linkedin}")
+            if portfolio:
+                contact_parts.append(f"Portfolio: {portfolio}")
+
+            if contact_parts:
+                contact_text = " | ".join(contact_parts)
+                story.append(Paragraph(contact_text, normal_style))
+                story.append(Spacer(1, 12))
+
+            # Summary
+            summary = resume_data.get("summary", "")
+            if summary:
+                story.append(Paragraph("Professional Summary", heading_style))
+                story.append(Paragraph(summary, normal_style))
+                story.append(Spacer(1, 12))
+
+            # Skills
+            skills = resume_data.get("skills", {})
+            if skills:
+                story.append(Paragraph("Skills", heading_style))
+                for category, skill_list in skills.items():
+                    if skill_list:
+                        category_text = f"<b>{category.title()}:</b> {', '.join(skill_list)}"
+                        story.append(Paragraph(category_text, normal_style))
+                story.append(Spacer(1, 12))
+
+            # Experience
+            experience = resume_data.get("experience", [])
+            if experience:
+                story.append(Paragraph("Professional Experience", heading_style))
+                for exp in experience:
+                    if isinstance(exp, dict):
+                        title = exp.get("title", "")
+                        company = exp.get("company", "")
+                        duration = exp.get("duration", "")
+                        description = exp.get("description", "")
+
+                        if title or company:
+                            header = f"<b>{title}</b>"
+                            if company:
+                                header += f" at {company}"
+                            if duration:
+                                header += f" ({duration})"
+                            story.append(Paragraph(header, normal_style))
+
+                        if description:
+                            # Handle bullet points
+                            desc_lines = description.split('\n')
+                            for line in desc_lines:
+                                line = line.strip()
+                                if line.startswith('•') or line.startswith('-'):
+                                    story.append(Paragraph(line[1:].strip(), bullet_style))
+                                elif line:
+                                    story.append(Paragraph(line, normal_style))
+
+                        story.append(Spacer(1, 6))
+                story.append(Spacer(1, 12))
+
+            # Education
+            education = resume_data.get("education", [])
+            if education:
+                story.append(Paragraph("Education", heading_style))
+                for edu in education:
+                    if isinstance(edu, dict):
+                        degree = edu.get("degree", "")
+                        school = edu.get("school", "")
+                        year = edu.get("year", "")
+
+                        edu_text = f"<b>{degree}</b>"
+                        if school:
+                            edu_text += f" - {school}"
+                        if year:
+                            edu_text += f" ({year})"
+
+                        story.append(Paragraph(edu_text, normal_style))
+                story.append(Spacer(1, 12))
+
+            # Projects
+            projects = resume_data.get("projects", [])
+            if projects:
+                story.append(Paragraph("Projects", heading_style))
+                for project in projects:
+                    if isinstance(project, dict):
+                        name = project.get("name", "")
+                        description = project.get("description", "")
+                        technologies = project.get("technologies", "")
+
+                        if name:
+                            story.append(Paragraph(f"<b>{name}</b>", normal_style))
+
+                        if technologies:
+                            story.append(Paragraph(f"<i>Technologies: {technologies}</i>", normal_style))
+
+                        if description:
+                            desc_lines = description.split('\n')
+                            for line in desc_lines:
+                                line = line.strip()
+                                if line.startswith('•') or line.startswith('-'):
+                                    story.append(Paragraph(line[1:].strip(), bullet_style))
+                                elif line:
+                                    story.append(Paragraph(line, normal_style))
+
+                        story.append(Spacer(1, 6))
+                story.append(Spacer(1, 12))
+
+            # Certifications
+            certifications = resume_data.get("certifications", [])
+            if certifications:
+                story.append(Paragraph("Certifications", heading_style))
+                for cert in certifications:
+                    if cert:
+                        story.append(Paragraph(f"• {cert}", bullet_style))
+                story.append(Spacer(1, 12))
+
+            # Achievements
+            achievements = resume_data.get("achievements", [])
+            if achievements:
+                story.append(Paragraph("Achievements", heading_style))
+                for achievement in achievements:
+                    if achievement:
+                        story.append(Paragraph(f"• {achievement}", bullet_style))
+                story.append(Spacer(1, 12))
+
+            # Build the PDF
+            doc.build(story)
+
         except Exception as e:
-            print("⚠️ PDF generation skipped:", e)
+            print("⚠️ PDF generation failed:", e)
+            # Fallback: create a simple text file
+            try:
+                with open(output_file.replace('.pdf', '.txt'), 'w') as f:
+                    f.write(f"Resume for {resume_data.get('name', 'User')}\n")
+                    f.write("Generated with ReportLab\n")
+            except Exception:
+                pass
+
         return output_file
 
     def generate_docx(self, resume_data: dict, output_file: str = "resume.docx") -> str:
