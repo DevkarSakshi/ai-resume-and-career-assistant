@@ -545,9 +545,11 @@ def run_ai_resume_workflow(
     # 5) Generate resume files (PDF + DOCX)
     from resume_generator import ResumeGenerator
 
-    os.makedirs("generated_resumes", exist_ok=True)
-    pdf_path = f"generated_resumes/{session_id}_resume.pdf"
-    docx_path = f"generated_resumes/{session_id}_resume.docx"
+    # Create generated_resumes directory in the backend folder
+    resumes_dir = os.path.join(os.path.dirname(__file__), "generated_resumes")
+    os.makedirs(resumes_dir, exist_ok=True)
+    pdf_path = os.path.join(resumes_dir, f"{session_id}_resume.pdf")
+    docx_path = os.path.join(resumes_dir, f"{session_id}_resume.docx")
 
     generator = ResumeGenerator()
     try:

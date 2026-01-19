@@ -255,11 +255,12 @@ async def clear_session(session_id: str):
 @app.get("/download_resume/{session_id}")
 def download_resume(session_id: str):
     # Resume files are generated server-side into backend/generated_resumes/
-    pdf_file = f"generated_resumes/{session_id}_resume.pdf"
-    
+    resumes_dir = os.path.join(os.path.dirname(__file__), "generated_resumes")
+    pdf_file = os.path.join(resumes_dir, f"{session_id}_resume.pdf")
+
     if not os.path.exists(pdf_file):
         return {"error": "Resume not found"}
-    
+
     return FileResponse(
         path=pdf_file,
         media_type="application/pdf",
@@ -270,7 +271,8 @@ def download_resume(session_id: str):
 @app.get("/download_resume_docx/{session_id}")
 def download_resume_docx(session_id: str):
     # Resume DOCX is generated server-side into backend/generated_resumes/
-    docx_file = f"generated_resumes/{session_id}_resume.docx"
+    resumes_dir = os.path.join(os.path.dirname(__file__), "generated_resumes")
+    docx_file = os.path.join(resumes_dir, f"{session_id}_resume.docx")
 
     if not os.path.exists(docx_file):
         return {"error": "Resume not found"}
